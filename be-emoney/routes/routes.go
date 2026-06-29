@@ -24,10 +24,17 @@ func Setup(db *gorm.DB, rdb *redis.Client, firebaseApp *firebase.App, cfg *confi
 	authHandler := handlers.NewAuthHandler(db, firebaseApp, jwtSvc, otpSvc, cfg)
 	otpHandler := handlers.NewOTPHandler(db, otpSvc)
 	paymentHandler := handlers.NewPaymentHandler(db, otpSvc)
+	productHandler := handlers.NewProductHandler(db)
+	cartHandler := handlers.NewCartHandler(db)
+	orderHandler := handlers.NewOrderHandler(db)
 
 	v1 := r.Group("/v1")
 	{
 		v1.GET("/health", handlers.HealthCheck)
+
+		// Products (public)
+		v1.GET("/products", productHandler.GetProducts)
+		v1.GET("/products/:id", productHandler.GetProduct)
 
 		auth := v1.Group("/auth")
 		{
@@ -39,6 +46,7 @@ func Setup(db *gorm.DB, rdb *redis.Client, firebaseApp *firebase.App, cfg *confi
 			{
 				authRequired.GET("/me", authHandler.Me)
 				authRequired.PUT("/fcm-token", authHandler.UpdateFCMToken)
+				authRequired.POST("/fcm-token", authHandler.UpdateFCMToken)
 				authRequired.POST("/verify-email-otp", authHandler.VerifyEmailOTP)
 			}
 		}
@@ -55,6 +63,25 @@ func Setup(db *gorm.DB, rdb *redis.Client, firebaseApp *firebase.App, cfg *confi
 				totpGroup.POST("/register", otpHandler.RegisterTOTP)
 				totpGroup.POST("/verify", otpHandler.VerifyTOTP)
 			}
+		}
+
+		// Cart (auth required)
+		cart := v1.Group("/cart")
+		cart.Use(middleware.AuthMiddleware(jwtSvc))
+		{
+			cart.GET("", cartHandler.GetCart)
+			cart.POST("", cartHandler.AddToCart)
+			cart.DELETE("", cartHandler.ClearCart)
+			cart.DELETE("/:id", cartHandler.RemoveFromCart)
+		}
+
+		// Orders (auth required)
+		orders := v1.Group("/orders")
+		orders.Use(middleware.AuthMiddleware(jwtSvc))
+		{
+			orders.POST("/checkout", orderHandler.Checkout)
+			orders.GET("", orderHandler.GetOrders)
+			orders.GET("/:id", orderHandler.GetOrder)
 		}
 
 		account := v1.Group("/account")

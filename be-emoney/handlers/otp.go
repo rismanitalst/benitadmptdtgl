@@ -164,10 +164,7 @@ func (h *OTPHandler) RegisterTOTP(c *gin.Context) {
 
 // POST /v1/otp/totp/verify
 func (h *OTPHandler) VerifyTOTP(c *gin.Context) {
-	user, ok := h.getUser(c)
-	if !ok {
-		return
-	}
+	userID := c.GetUint("user_id")
 
 	var req VerifyTOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -178,7 +175,17 @@ func (h *OTPHandler) VerifyTOTP(c *gin.Context) {
 		return
 	}
 
-	valid, err := h.otpSvc.VerifyTOTP(c.Request.Context(), user, req.Code)
+	// Fetch user fresh from DB to get the latest totp_secret
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"message": "User tidak ditemukan",
+		})
+		return
+	}
+
+	valid, err := h.otpSvc.VerifyTOTP(c.Request.Context(), &user, req.Code)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

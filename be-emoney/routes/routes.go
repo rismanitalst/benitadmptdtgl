@@ -1,12 +1,14 @@
 package routes
 
 import (
+	"time"
 	"emoney-2fa/config"
 	"emoney-2fa/handlers"
 	"emoney-2fa/middleware"
 	"emoney-2fa/services"
 
 	firebase "firebase.google.com/go/v4"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -16,6 +18,17 @@ func Setup(db *gorm.DB, rdb *redis.Client, firebaseApp *firebase.App, cfg *confi
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger())
+
+	// CORS middleware - tambahin ini
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+	}))
+
 
 	jwtSvc := services.NewJWTService(cfg)
 	emailSvc := services.NewEmailService(cfg)
